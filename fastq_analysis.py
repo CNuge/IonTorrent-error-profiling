@@ -31,6 +31,14 @@ def read_fastq(filename):
 
 #turn phred scores into list of numerics
 #add a 'quality_nums' key to the dict that stores a list of the values.
+def numeric_qual(list_of_fqs):
+	"""
+	Take the string of Quality Phred scores and turn them into a list of numeric quality scores
+
+	"""
+	for read in list_of_fqs:
+		read['num_quality'] = [ord(x) for x in list(read['quality'])]
+
 
 
 def dereplicate(records):
@@ -43,14 +51,52 @@ def dereplicate(records):
 	for rec in records:
 		seq = rec['sequence']
 		if seq not in obvs_seqs:
-			seq_qualities[seq] = [rec['quality_nums']]
+			seq_qualities[seq] = [rec['num_quality']]
+			obvs_seqs.add(seq)
 
-	outseq = []
-	#for each unique sequence, 
-		#return a dict with:
-		# single string of the read
-		# a read count (len(v))
-		# the avg of the qual score for each base, get this using a numpy array
-		#
+		else:
+			seq_qualities[seq].append(rec['num_quality'])
 
-	#return a dict 
+	avg_qual = {}
+
+	for s in obvs_seqs:
+		#make an array of the quality scores and then average the score for each position
+		qual_dat = np.array(seq_qualities[s])
+		avg_scores = qual_dat.mean(axis=0)
+		avg_qual[s] = avg_scores
+
+	return avg_qual
+
+
+if __name__ == '__main__':
+	
+
+example_input = '/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03299)CCDB-S5-0084)CBGMB-00030.fastq'
+
+data = read_fastq(example_input)
+
+numeric_qual(data)
+
+dereplicated_data = dereplicate(data[:100])
+
+len(dereplicated_data)
+v1=list(dereplicated_data.keys())[1]
+dereplicated_data[v1]
+
+
+
+
+
+
+data[:5]
+
+
+len(data) #1 123 847 reads... lets see how long the dereplication algorithm I'm making takes
+
+read = data[1]
+read
+
+
+#note there I'm using a cap length, for dereplicated reads they'll inherently be the same length
+qual_dat = [x['num_quality'][:50] for x in data[:5]]
+len(qual_dat)

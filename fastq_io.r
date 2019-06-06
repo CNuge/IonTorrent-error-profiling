@@ -5,6 +5,7 @@ library(microseq)
 #install.packages('gtools')
 library(gtools)
 
+library(muscle)
 
 #This data is from a Thermo Ion S5 sequencer. 
 #Metabarcoding data from a malaise trap ontario provincial parks dataset
@@ -50,5 +51,88 @@ head(test)
 #####
 #try to dereplicate these reads
 
-#get the OTU output from mBRAVE and look at the sequences of the OTUs, explore them for evidence
-#of spurious OTUs resulting from sequencer errors.
+
+
+
+####
+# try to align the reads to one another
+
+#a hypothetical 'true' sanger sequence
+s1 = 'actttatactttctctttcggaagatgggcaggtatagttggaacctctttgaagcttacttattcgtgccgaactgggaaatcctgggacattaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
+#two hypothetical HTS datasets, with errors
+s2 = 'actttatacttttctctttcggaagatggcaggtatagttggaacctctttgaagctttacttattcgtgcccgaactgggaatcctgggacattaatcggagatgaccaaaattacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
+s3 = 'acttttatacatttctcttcggaagatggggcaggtatagttggaacctctttgaagcttacttattcgtgccgaaactgggaaatcctgggacatttaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
+
+?DNAStringSet
+DNAStringSet()
+
+## When the input vector contains a lot of duplicates, turning it into
+## a factor first before passing it to the constructor will produce an
+## XStringSet object that is more compact in memory:
+
+#take a sanger-hts pair, align them to one another and then characterize the errors
+pairwise_align = function(s1, s2){
+
+	align = DNAStringSet(muscle::muscle(DNAStringSet(c(s1, s2)), maxiters = 2))
+	a1 = unlist(strsplit(as.character(align[[1]]),"")) 
+	a2 = unlist(strsplit(as.character(align[[2]]),""))
+
+	return(list(a1=a1, a2=a2)
+}
+
+
+#this function will take in an aligned pair of sanger-hts sequences
+#and count the number of insertions, deletions and mutations for each bp
+characterize_errors = function(a1, a2){
+
+	insertions = list(a= 0, t= 0, g= 0, c= 0)
+	deletions  = list(a= 0, t= 0, g= 0, c= 0)
+	
+	#row = the sanger base
+	#column = what it mutated to in the HTS data
+	mutations = data.frame(a=rep(0,4),
+								t=rep(0,4),
+								g=rep(0,4),
+								c=rep(0,4),
+								row.names = c('a', 't','g','c'))
+
+	for(i in 1:length(a1)){
+		if(a1[i] != a2[i]){
+
+			#inserted base in HTS 
+			if(a1[i] == '-'){
+				insertions[a2[i]] = insertions[a2[i]] + 1 
+			}
+			#deleted base in HTS
+			if(a2[i] == '-'){
+				deletions[a1[i]] = deletions[a1[i]] + 1 
+			}
+			#mutation
+			else{
+				mutations[a1[i], a2[i]] = mutations[a1[i], a2[i]] + 1
+			}
+		}
+	}
+
+	outdat = list(insertions=insertions, deletions=deletions, mutations = mutations)
+	return()
+}
+
+#this function takes an aligned pair of sanger-hts sequences and determines how many of the
+#indels are associated with homopolymers in the true sequence
+homopolymer_indels = function(a1,a2){
+
+	hpols = data.frame(non_hp=rep(0,4),
+						two_hp=rep(0,4),
+						three_hp=rep(0,4),
+						quad_plus_hp=rep(0,4),
+						row.names = c('a', 't','g','c'))
+
+	#before writing this look at some examples, are the hps always before or after the indels?
+	#or do we need to check the bp to both sides of the indel
+
+}
+
+
+
+

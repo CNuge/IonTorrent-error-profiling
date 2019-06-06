@@ -71,32 +71,19 @@ def dereplicate(records):
 if __name__ == '__main__':
 	
 
-example_input = '/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03299)CCDB-S5-0084)CBGMB-00030.fastq'
+	example_input = '/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03299)CCDB-S5-0084)CBGMB-00030.fastq'
 
-data = read_fastq(example_input)
+	data = read_fastq(example_input)
+	len(data) #1 123 847 reads... lets see how long the dereplication algorithm I'm making takes
+	#^not great it crashes when dereplicating
 
-numeric_qual(data)
+	#this modifies the dictonary in place
+	numeric_qual(data)
 
-dereplicated_data = dereplicate(data[:100])
+	#this is using only the first 100 reads b/c of memory constraints on laptop... try full on server
+	dereplicated_data = dereplicate(data[:100])
 
-len(dereplicated_data)
-v1=list(dereplicated_data.keys())[1]
-dereplicated_data[v1]
+	len(dereplicated_data)
+	v1=list(dereplicated_data.keys())[1]
+	dereplicated_data[v1]
 
-
-
-
-
-
-data[:5]
-
-
-len(data) #1 123 847 reads... lets see how long the dereplication algorithm I'm making takes
-
-read = data[1]
-read
-
-
-#note there I'm using a cap length, for dereplicated reads they'll inherently be the same length
-qual_dat = [x['num_quality'][:50] for x in data[:5]]
-len(qual_dat)

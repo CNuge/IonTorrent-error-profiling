@@ -16,8 +16,6 @@ library(muscle)
 
 #here is code for getting the quality information into a numeric vector, matches the positions in the 
 #sequence strings, these could be passed in to a stastical model along with the 
-
-
 phred2numeric = function(phred_string){
 	outvec = asc(unlist(strsplit(phred_string, "")))
 	return(outvec - 33)
@@ -66,7 +64,6 @@ characterize_errors = function(a1, a2){
 
 	for(i in 1:length(a1)){
 		if(a1[i] != a2[i]){
-
 			#inserted base in HTS 
 			if(a1[i] == '-'){
 				insertions[a2[i]] = insertions[[a2[i]]] + 1 
@@ -81,7 +78,6 @@ characterize_errors = function(a1, a2){
 				mutations[a1[i], a2[i]] = mutations[a1[i], a2[i]] + 1
 				mutation_pos = c(mutation_pos , pos_in_sanger)				
 				pos_in_sanger = pos_in_sanger + 1	
-
 			}
 		} else {
 				pos_in_sanger = pos_in_sanger + 1	
@@ -94,20 +90,82 @@ characterize_errors = function(a1, a2){
 }
 
 
+#when an insertion or deletion is found, look at the complimentary 
+#alignment string and count the number of same base pairs in either direction
+#from the index position to characterize the length of the homopolymer
+hpol_count = function(i, align_compliment){
+	#count same before
+	same_before = 0
+	for(x in i-1:1){
+		if(align_compliment[x] == align_compliment[i]){
+			same_before = same_before + 1
+		} else {
+			break
+		}
+	}
+	#count same after
+	same_after = 0
+	for(x in i+1:length(align_compliment)){
+		if(align_compliment[x] == align_compliment[i]){
+			same_after = same_after + 1
+		} else {
+			break
+		}
+	}
+	return(same_before + same_after)
+}
+
 
 #this function takes an aligned pair of sanger-hts sequences and determines how many of the
 #indels are associated with homopolymers in the true sequence
 homopolymer_indels = function(a1, a2){
 
-	hpols = data.frame(non_hp=rep(0,4),
+	hpols_in = data.frame(non_hp=rep(0,4),
 						two_hp=rep(0,4),
 						three_hp=rep(0,4),
 						quad_plus_hp=rep(0,4),
 						row.names = c('a', 't','g','c'))
 
-	#before writing this look at some examples, are the hps always before or after the indels?
-	#or do we need to check the bp to both sides of the indel
+	hpols_del = data.frame(non_hp=rep(0,4),
+						two_hp=rep(0,4),
+						three_hp=rep(0,4),
+						quad_plus_hp=rep(0,4),
+						row.names = c('a', 't','g','c'))
 
+	for(i in 1:length(a1)){
+		#insertion
+		if(a1[i] == '-'){
+			#look at a2[i], this is the inserted base
+			hpol_len = hpol_count(i, a2)
+
+			if (hpol_len == 2){
+				hpols_in[a2[i], 'two_hp'] = hpols_in[a2[i], 'two_hp'] + 1
+			}else if(hpol_len == 3){
+				hpols_in[a2[i], 'three_hp'] = hpols_in[a2[i], 'three_hp'] + 1
+
+			}else if(hpol_len > 3){
+				hpols_in[a2[i], 'quad_plus_hp'] = hpols_in[a2[i], 'quad_plus_hp'] + 1
+			}else{
+				hpols_in[a2[i], 'non_hp'] = hpols_in[a2[i], 'non_hp'] + 1
+			}
+		#deletion
+		} else if (a2[i] == '-'){
+			#look at a1[i], this is the deleted base
+			hpol_len = hpol_count(i, a1)
+
+			if (hpol_len == 2){
+				hpols_del[a1[i], 'two_hp'] = hpols_del[a1[i], 'two_hp'] + 1
+			}else if(hpol_len == 3){
+				hpols_del[a1[i], 'three_hp'] = hpols_del[a1[i], 'three_hp'] + 1
+
+			}else if(hpol_len > 3){
+				hpols_del[a1[i], 'quad_plus_hp'] = hpols_del[a1[i], 'quad_plus_hp'] + 1
+			}else{
+				hpols_del[a1[i], 'non_hp'] = hpols_del[a1[i], 'non_hp'] + 1
+			}
+		}
+	}
+	return(list(insertions=hpols_in, deletions = hpols_del))
 }
 
 
@@ -117,15 +175,12 @@ data = readFastq('/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03
 
 #on server
 #data = readFastq('/home/cnugent/barcode_data/mBRAVE_raw_read_data/GMP-04500)CCDB-S5-0084)CBGMB-00030.fastq')
-
 head(data)
 names(data)
 #Columns are header, sequence and quality.... can the quality column be leveraged?
 
-
 phred_string = data$Quality[1]
 phred_string
-
 
 test = head(data)
 test$qual_vec = lapply(test$Quality , function(x){phred2numeric(x)})
@@ -137,13 +192,6 @@ head(test)
 #distribution of phred scores of data next to deletions and then randomly assign phred scores based on these ditributions.
 #^maybe best to go with real world data if using a phred layer on the input
 
-
-#####
-#try to dereplicate these reads
-
-
-
-
 ####
 # try to align the reads to one another
 
@@ -153,23 +201,20 @@ s1 = 'actttatactttctctttcggaagatgggcaggtatagttggaacctctttgaagcttacttattcgtgccgaa
 s2 = 'actttatacttttctctttcggaagatggcaggtatagttgggaacctctttgaagctttacttattcgtgcccgaactgggaatcctgggacattaatcggagatgaccaaaattacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttag'
 s3 = 'acttttatacatttctcttcggaagatggggcaggtatagttggaacctctttgaagcttacttattcgtgccgaaactgggaaatcctgggacatttaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaat'
 
-
-
-## When the input vector contains a lot of duplicates, turning it into
-## a factor first before passing it to the constructor will produce an
-## XStringSet object that is more compact in memory:
-
-
 align_test = pairwise_align(s1, s2)
 
 a1 = align_test$a1
 a2 = align_test$a2
 
-
 a_trimmed = trim_align(a1,a2)
 
-a1 = a_trimmed$a1
-a2 = a_trimmed$a2
+error_dat = characterize_errors(a_trimmed$a1, a_trimmed$a2)
+
+hpol_dat = homopolymer_indels(a_trimmed$a1, a_trimmed$a2)
 
 
-error_dat = characterize_errors(a_trimmed$a1,a_trimmed$a2)
+
+#TODO add some unit tests for the above code to the bottom here!
+#then it can be repurposed for the eventual error characterization.
+#likely want to have a script file to generate the output df with the stats, and
+#then another one to graph/stastically analyze the information.

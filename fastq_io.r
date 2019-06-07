@@ -27,8 +27,8 @@ phred2numeric = function(phred_string){
 #take a sanger-hts pair, align them to one another and then characterize the errors
 pairwise_align = function(s1, s2){
 	align = DNAStringSet(muscle::muscle(DNAStringSet(c(s1, s2)), maxiters = 2))
-	a1 = unlist(strsplit(as.character(align[[1]]),"")) 
-	a2 = unlist(strsplit(as.character(align[[2]]),""))
+	a1 = unlist(strsplit(tolower(as.character(align[[1]])),"")) 
+	a2 = unlist(strsplit(tolower(as.character(align[[2]])),""))
 	return(list(a1=a1, a2=a2))
 }
 
@@ -48,6 +48,7 @@ trim_align = function(a1, a2){
 #and count the number of insertions, deletions and mutations for each bp
 characterize_errors = function(a1, a2){
 
+	pos_in_sanger = 1
 	insertions = list(a= 0, t= 0, g= 0, c= 0)
 	deletions  = list(a= 0, t= 0, g= 0, c= 0)
 	
@@ -68,20 +69,22 @@ characterize_errors = function(a1, a2){
 
 			#inserted base in HTS 
 			if(a1[i] == '-'){
-				insertions[a2[i]] = insertions[a2[i]] + 1 
-				insertion_pos = c(insertion_pos, i)
-			}
+				insertions[a2[i]] = insertions[[a2[i]]] + 1 
+				insertion_pos = c(insertion_pos, pos_in_sanger)
 			#deleted base in HTS
-			if(a2[i] == '-'){
-				deletions[a1[i]] = deletions[a1[i]] + 1 
-				deletion_pos = c(deletion_pos, i)
+			}else if(a2[i] == '-'){
+				deletions[a1[i]] = deletions[[a1[i]]] + 1 
+				deletion_pos = c(deletion_pos, pos_in_sanger)
+				pos_in_sanger = pos_in_sanger + 1	
+			#mutation			
+			} else {
+				mutations[a1[i], a2[i]] = mutations[a1[i], a2[i]] + 1
+				mutation_pos = c(mutation_pos , pos_in_sanger)				
+				pos_in_sanger = pos_in_sanger + 1	
 
 			}
-			#mutation
-			else{
-				mutations[a1[i], a2[i]] = mutations[a1[i], a2[i]] + 1
-				mutation_pos = c(mutation_pos , i)				
-			}
+		} else {
+				pos_in_sanger = pos_in_sanger + 1	
 		}
 	}
 
@@ -117,13 +120,11 @@ data = readFastq('/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03
 
 head(data)
 names(data)
-
 #Columns are header, sequence and quality.... can the quality column be leveraged?
 
 
 phred_string = data$Quality[1]
 phred_string
-
 
 
 test = head(data)
@@ -161,8 +162,14 @@ s3 = 'acttttatacatttctcttcggaagatggggcaggtatagttggaacctctttgaagcttacttattcgtgccg
 
 align_test = pairwise_align(s1, s2)
 
-a1  = align_test$a1
+a1 = align_test$a1
 a2 = align_test$a2
 
 
 a_trimmed = trim_align(a1,a2)
+
+a1 = a_trimmed$a1
+a2 = a_trimmed$a2
+
+
+error_dat = characterize_errors(a_trimmed$a1,a_trimmed$a2)

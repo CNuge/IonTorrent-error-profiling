@@ -80,6 +80,12 @@ pairwise_align = function(s1, s2){
 	return(list(a1=a1, a2=a2)
 }
 
+#TODO - trim the pairwise alignment to the length of the IONTORRENT seequence
+#will likely have most the sequences <658 bp (quantify once real data) so we 
+#need to make sure the ------- at the end of the alignment aren't biasing the results
+#slice a1 and a1 to remove trailing dashes on the Iontorrent read, and the corresponding
+#bases on the true sanger sequence.
+
 
 #this function will take in an aligned pair of sanger-hts sequences
 #and count the number of insertions, deletions and mutations for each bp
@@ -96,26 +102,35 @@ characterize_errors = function(a1, a2){
 								c=rep(0,4),
 								row.names = c('a', 't','g','c'))
 
+	insertion_pos = c()
+	deletion_pos = c()
+	mutation_pos = c()
+
 	for(i in 1:length(a1)){
 		if(a1[i] != a2[i]){
 
 			#inserted base in HTS 
 			if(a1[i] == '-'){
 				insertions[a2[i]] = insertions[a2[i]] + 1 
+				insertion_pos = c(insertion_pos, i)
 			}
 			#deleted base in HTS
 			if(a2[i] == '-'){
 				deletions[a1[i]] = deletions[a1[i]] + 1 
+				deletion_pos = c(deletion_pos, i)
+
 			}
 			#mutation
 			else{
 				mutations[a1[i], a2[i]] = mutations[a1[i], a2[i]] + 1
+				mutation_pos = c(mutation_pos , i)				
 			}
 		}
 	}
 
-	outdat = list(insertions=insertions, deletions=deletions, mutations = mutations)
-	return()
+	bp_dat = list(insertions = insertions, deletions = deletions, mutations = mutations)
+	error_positions = list(insertion_pos = insertion_pos , deletion_pos = deletion_pos , mutation_pos = mutation_pos )
+	return(list(bp_dat = bp_dat, error_positions = error_positions))
 }
 
 #this function takes an aligned pair of sanger-hts sequences and determines how many of the

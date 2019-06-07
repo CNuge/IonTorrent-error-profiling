@@ -4,20 +4,8 @@ library(tidyverse)
 library(microseq)
 #install.packages('gtools')
 library(gtools)
-
+#install.packages('muscle')
 library(muscle)
-
-#This data is from a Thermo Ion S5 sequencer. 
-#Metabarcoding data from a malaise trap ontario provincial parks dataset
-data = readFastq('/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03299)CCDB-S5-0084)CBGMB-00030.fastq')
-
-#on server
-#data = readFastq('/home/cnugent/barcode_data/mBRAVE_raw_read_data/GMP-04500)CCDB-S5-0084)CBGMB-00030.fastq')
-
-head(data)
-names(data)
-
-#Columns are header, sequence and quality.... can the quality column be leveraged?
 
 #In FASTQ files, quality scores are encoded into a compact form, 
 #which uses only 1 byte per quality value. In this encoding, 
@@ -29,62 +17,31 @@ names(data)
 #here is code for getting the quality information into a numeric vector, matches the positions in the 
 #sequence strings, these could be passed in to a stastical model along with the 
 
-phred_string = data$Quality[1]
-phred_string
 
 phred2numeric = function(phred_string){
 	outvec = asc(unlist(strsplit(phred_string, "")))
 	return(outvec - 33)
 }
 
-test = head(data)
-test$qual_vec = lapply(test$Quality , function(x){phred2numeric(x)})
-head(test)
-
-#is using the phred scores as an input feature, would pass them in as another tensor to the input of the model
-
-#if using artifical training data, would need to find the distribution of phred scores for inserted data, and the 
-#distribution of phred scores of data next to deletions and then randomly assign phred scores based on these ditributions.
-#^maybe best to go with real world data if using a phred layer on the input
-
-
-#####
-#try to dereplicate these reads
-
-
-
-
-####
-# try to align the reads to one another
-
-#a hypothetical 'true' sanger sequence
-s1 = 'actttatactttctctttcggaagatgggcaggtatagttggaacctctttgaagcttacttattcgtgccgaactgggaaatcctgggacattaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
-#two hypothetical HTS datasets, with errors
-s2 = 'actttatacttttctctttcggaagatggcaggtatagttggaacctctttgaagctttacttattcgtgcccgaactgggaatcctgggacattaatcggagatgaccaaaattacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
-s3 = 'acttttatacatttctcttcggaagatggggcaggtatagttggaacctctttgaagcttacttattcgtgccgaaactgggaaatcctgggacatttaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
-
-?DNAStringSet
-DNAStringSet()
-
-## When the input vector contains a lot of duplicates, turning it into
-## a factor first before passing it to the constructor will produce an
-## XStringSet object that is more compact in memory:
 
 #take a sanger-hts pair, align them to one another and then characterize the errors
 pairwise_align = function(s1, s2){
-
 	align = DNAStringSet(muscle::muscle(DNAStringSet(c(s1, s2)), maxiters = 2))
 	a1 = unlist(strsplit(as.character(align[[1]]),"")) 
 	a2 = unlist(strsplit(as.character(align[[2]]),""))
-
-	return(list(a1=a1, a2=a2)
+	return(list(a1=a1, a2=a2))
 }
 
-#TODO - trim the pairwise alignment to the length of the IONTORRENT seequence
-#will likely have most the sequences <658 bp (quantify once real data) so we 
-#need to make sure the ------- at the end of the alignment aren't biasing the results
-#slice a1 and a1 to remove trailing dashes on the Iontorrent read, and the corresponding
-#bases on the true sanger sequence.
+
+#take the alignment output and trim them to remove the trailing dashes (from the HTs) 
+#and the corresponding bases in the alignment pair
+trim_align = function(a1, a2){
+	for(i in length(a2):1){
+		if(a2[i] != '-'){
+			return(list(a1=a1[1:i], a2=a2[1:i]))
+		}
+	}
+}
 
 
 #this function will take in an aligned pair of sanger-hts sequences
@@ -133,9 +90,11 @@ characterize_errors = function(a1, a2){
 	return(list(bp_dat = bp_dat, error_positions = error_positions))
 }
 
+
+
 #this function takes an aligned pair of sanger-hts sequences and determines how many of the
 #indels are associated with homopolymers in the true sequence
-homopolymer_indels = function(a1,a2){
+homopolymer_indels = function(a1, a2){
 
 	hpols = data.frame(non_hp=rep(0,4),
 						two_hp=rep(0,4),
@@ -149,5 +108,61 @@ homopolymer_indels = function(a1,a2){
 }
 
 
+#This data is from a Thermo Ion S5 sequencer. 
+#Metabarcoding data from a malaise trap ontario provincial parks dataset
+data = readFastq('/home/cnuge/Documents/barcode_data/mBRAVE_raw_read_data/GMP-03299)CCDB-S5-0084)CBGMB-00030.fastq')
+
+#on server
+#data = readFastq('/home/cnugent/barcode_data/mBRAVE_raw_read_data/GMP-04500)CCDB-S5-0084)CBGMB-00030.fastq')
+
+head(data)
+names(data)
+
+#Columns are header, sequence and quality.... can the quality column be leveraged?
 
 
+phred_string = data$Quality[1]
+phred_string
+
+
+
+test = head(data)
+test$qual_vec = lapply(test$Quality , function(x){phred2numeric(x)})
+head(test)
+
+#is using the phred scores as an input feature, would pass them in as another tensor to the input of the model
+
+#if using artifical training data, would need to find the distribution of phred scores for inserted data, and the 
+#distribution of phred scores of data next to deletions and then randomly assign phred scores based on these ditributions.
+#^maybe best to go with real world data if using a phred layer on the input
+
+
+#####
+#try to dereplicate these reads
+
+
+
+
+####
+# try to align the reads to one another
+
+#a hypothetical 'true' sanger sequence
+s1 = 'actttatactttctctttcggaagatgggcaggtatagttggaacctctttgaagcttacttattcgtgccgaactgggaaatcctgggacattaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaatgacctttgaccgaatacccctatttgtttgatcagtagctttaactgcccttcttcttcttctgtctcttcccgtattagcaggcgcaatcactatacttttaacagaccgaaatattaatacgtcattctttgaccctgcgggaggaggagaccccattctataccaacatttattt'
+#two hypothetical HTS datasets, with errors
+s2 = 'actttatacttttctctttcggaagatggcaggtatagttgggaacctctttgaagctttacttattcgtgcccgaactgggaatcctgggacattaatcggagatgaccaaaattacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttag'
+s3 = 'acttttatacatttctcttcggaagatggggcaggtatagttggaacctctttgaagcttacttattcgtgccgaaactgggaaatcctgggacatttaatcggagatgaccaaatttacaatgttattgtaactgcacatgcatttgtaataattttctttatagtaatacctattatgattggagggtttggaaattggctggtacccctgatacttggcgcccctgacatagcattcccccgaataaataatataagattctgattattacccccttccctaactctccttttaataagaagccttgtagaaaggggggccggtaccggatggacagtatacccgcccctatctgccaatattgcccatagaggggcttctgtagacttagccatttttagcctccacttagccggtatctcatcaattttgggagctgtgaattttattactaccgttattaacatacgttctacaggaat'
+
+
+
+## When the input vector contains a lot of duplicates, turning it into
+## a factor first before passing it to the constructor will produce an
+## XStringSet object that is more compact in memory:
+
+
+align_test = pairwise_align(s1, s2)
+
+a1  = align_test$a1
+a2 = align_test$a2
+
+
+a_trimmed = trim_align(a1,a2)
